@@ -1,6 +1,6 @@
 #!/bin/bash
 # Usage: ./makevideo.sh <image_directory> <image_pattern> <duration_per_image> <output_video>
-# Example: ./makevideo.sh progress "groepsfoto_resized_smaller_scaled_smaller_dithered_uniform_*.png" 0.04 output.mp4
+# Example: ./makevideo.sh progress-gaussian-sigma1-ssim-psnr-mse "groepsfoto_resized_smaller_scaled_smaller_dithered_uniform_*.png" 0.04 output-mse.mp4
 
 if [ "$#" -ne 4 ]; then
     echo "Usage: $0 <image_directory> <image_pattern> <duration_per_image> <output_video>"

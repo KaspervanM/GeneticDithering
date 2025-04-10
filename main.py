@@ -2,17 +2,14 @@
 # The chromosome will be the pixels of a greyscale image ordered in a 1D array according to a locality preserving space-filling curve.
 # There will be multiple loss functions.
 # The chromosomes will be exposed to mutations and crossovers
-import random
 from abc import ABC, abstractmethod
-from typing import Optional, Any
+from typing import Optional
 
 import numpy as np
 import numpy.typing as npt
 from PIL import Image as ImageWrapper
 from PIL.Image import Image
 import math
-
-import concurrent.futures
 
 Chromosome = npt.NDArray[np.bool_]
 ImageChromosome = npt.NDArray[np.float64]
@@ -26,6 +23,7 @@ def load_image(file_path: str) -> Image:
     """
     img = ImageWrapper.open(file_path)
     return img.convert('L')  # Convert to grayscale
+
 
 def save_image(image: Image, file_path: str) -> None:
     """
@@ -41,6 +39,7 @@ class SpaceFillingCurve(ABC):
     """
     Abstract base class for space-filling curves.
     """
+
     def __init__(self, width: int, height: int):
         """
         Initialize the space-filling curve.
@@ -103,7 +102,6 @@ class HilbertCurve(SpaceFillingCurve):
                 s *= 2
             return x, y
 
-
         if self.curve:
             return self.curve
 
@@ -135,14 +133,14 @@ class HilbertCurve(SpaceFillingCurve):
         return self.curve
 
 
-def preprocess_image(image: Image, space_filling_curve: SpaceFillingCurve) -> ImageChromosome:
+def preprocess_image(image: Image, curve: [(int, int)]) -> ImageChromosome:
     """
     Preprocess the image using the space-filling curve.
     :param image: PIL Image object.
-    :param space_filling_curve: SpaceFillingCurve object.
+    :param curve: List of (x, y) coordinates representing the curve.
     :return: List of pixel values between 0 and 1 in the order defined by the space-filling curve.
     """
-    curve = space_filling_curve.generate_curve()
+
     # Get pixel values in the order defined by the curve.
     pixel_values = np.ndarray(shape=(len(curve),), dtype=np.float64)
     for i, (x, y) in enumerate(curve):
@@ -153,18 +151,18 @@ def preprocess_image(image: Image, space_filling_curve: SpaceFillingCurve) -> Im
     return pixel_values
 
 
-def convert_chromosome_to_image(chromosome: Chromosome, width: int, height: int, space_filling_curve: SpaceFillingCurve) -> Image:
+def convert_chromosome_to_image(chromosome: Chromosome, width: int, height: int, curve: [(int, int)]) -> Image:
     """
     Convert a chromosome (list of pixel values 0 and 1) to an image according to some space-filling curve.
     :param chromosome: List of pixel values.
     :param width: Width of the image.
     :param height: Height of the image.
-    :param space_filling_curve: SpaceFillingCurve object.
+    :param curve: List of (x, y) coordinates representing the curve.
     :return: PIL Image object.
     """
     if len(chromosome) != width * height:
         raise ValueError("Chromosome length must match image size.")
-    curve = space_filling_curve.generate_curve()
+
     # Create a new image
     new_image = ImageWrapper.new('L', (width, height))
     # Set pixel values according to the chromosome and the curve
@@ -174,7 +172,8 @@ def convert_chromosome_to_image(chromosome: Chromosome, width: int, height: int,
     return new_image
 
 
-def mutate_chromosome(chromosome: Chromosome, mutation_rate: float, random_generator: np.random.RandomState = None) -> Chromosome:
+def mutate_chromosome(chromosome: Chromosome, mutation_rate: float,
+                      random_generator: np.random.RandomState = np.random.RandomState()) -> Chromosome:
     """
     Mutate a chromosome by flipping bits with a given mutation rate.
     :param chromosome: List of pixel values.
@@ -182,8 +181,6 @@ def mutate_chromosome(chromosome: Chromosome, mutation_rate: float, random_gener
     :param random_generator: Optional random generator for reproducibility.
     :return: Mutated chromosome.
     """
-    if random_generator is None:
-        random_generator = np.random.RandomState()
 
     bit_flip_mask = random_generator.rand(len(chromosome)) < mutation_rate
     mutated_chromosome = np.copy(chromosome)
@@ -199,7 +196,10 @@ class CrossOverFunction(ABC):
     """
 
     @abstractmethod
-    def crossover(self, parent1: Chromosome, parent2: Chromosome, crossover_rate: float, crossover_degree: Optional[float], random_generator: Optional[np.random.RandomState] = None) -> (Chromosome, Chromosome):
+    def crossover(self, parent1: Chromosome, parent2: Chromosome, crossover_rate: float,
+                  crossover_degree: Optional[float],
+                  random_generator: np.random.RandomState = np.random.RandomState()) -> (
+            Chromosome, Chromosome):
         """
         Perform crossover between two chromosomes.
         :param parent1: First parent chromosome.
@@ -217,7 +217,10 @@ class SinglePointCrossover(CrossOverFunction):
     Class for single-point crossover.
     """
 
-    def crossover(self, parent1: Chromosome, parent2: Chromosome, crossover_rate: float, crossover_degree: Optional[float], random_generator: Optional[np.random.RandomState] = None) -> (Chromosome, Chromosome):
+    def crossover(self, parent1: Chromosome, parent2: Chromosome, crossover_rate: float,
+                  crossover_degree: Optional[float],
+                  random_generator: np.random.RandomState = np.random.RandomState()) -> (
+            Chromosome, Chromosome):
         """
         Perform single-point crossover between two chromosomes.
         :param parent1: First parent chromosome.
@@ -227,8 +230,6 @@ class SinglePointCrossover(CrossOverFunction):
         :param random_generator: Optional random generator for reproducibility.
         :return: Two offspring chromosomes.
         """
-        if random_generator is None:
-            random_generator = np.random.RandomState()
 
         if random_generator.rand() < crossover_rate:
             crossover_point = random_generator.randint(1, len(parent1) - 1)
@@ -244,7 +245,10 @@ class TwoPointCrossover(CrossOverFunction):
     Class for two-point crossover.
     """
 
-    def crossover(self, parent1: Chromosome, parent2: Chromosome, crossover_rate: float, crossover_degree: Optional[float], random_generator: Optional[np.random.RandomState] = None) -> (Chromosome, Chromosome):
+    def crossover(self, parent1: Chromosome, parent2: Chromosome, crossover_rate: float,
+                  crossover_degree: Optional[float],
+                  random_generator: np.random.RandomState = np.random.RandomState()) -> (
+            Chromosome, Chromosome):
         """
         Perform two-point crossover between two chromosomes.
         :param parent1: First parent chromosome.
@@ -254,8 +258,6 @@ class TwoPointCrossover(CrossOverFunction):
         :param random_generator: Optional random generator for reproducibility.
         :return: Two offspring chromosomes.
         """
-        if random_generator is None:
-            random_generator = np.random.RandomState()
 
         if crossover_degree is None:
             crossover_degree = 0.5
@@ -264,18 +266,24 @@ class TwoPointCrossover(CrossOverFunction):
             crossover_point_distance = random_generator.binomial(len(parent1), crossover_degree)
             crossover_point1 = random_generator.randint(1, len(parent1) - crossover_point_distance)
             crossover_point2 = crossover_point1 + crossover_point_distance
-            offspring1 = np.concatenate((parent1[:crossover_point1], parent2[crossover_point1:crossover_point2], parent1[crossover_point2:]))
-            offspring2 = np.concatenate((parent2[:crossover_point1], parent1[crossover_point1:crossover_point2], parent2[crossover_point2:]))
+            offspring1 = np.concatenate(
+                (parent1[:crossover_point1], parent2[crossover_point1:crossover_point2], parent1[crossover_point2:]))
+            offspring2 = np.concatenate(
+                (parent2[:crossover_point1], parent1[crossover_point1:crossover_point2], parent2[crossover_point2:]))
             return offspring1, offspring2
         else:
             return parent1, parent2
+
 
 class UniformCrossover(CrossOverFunction):
     """
     Class for uniform crossover.
     """
 
-    def crossover(self, parent1: Chromosome, parent2: Chromosome, crossover_rate: float, crossover_degree: Optional[float], random_generator: Optional[np.random.RandomState] = None) -> (Chromosome, Chromosome):
+    def crossover(self, parent1: Chromosome, parent2: Chromosome, crossover_rate: float,
+                  crossover_degree: Optional[float],
+                  random_generator: np.random.RandomState = np.random.RandomState()) -> (
+            Chromosome, Chromosome):
         """
         Perform uniform crossover between two chromosomes.
         :param parent1: First parent chromosome.
@@ -285,8 +293,6 @@ class UniformCrossover(CrossOverFunction):
         :param random_generator: Optional random generator for reproducibility.
         :return: Two offspring chromosomes.
         """
-        if random_generator is None:
-            random_generator = np.random.RandomState()
 
         if random_generator.rand() < crossover_rate:
             crossover_mask = random_generator.rand(len(parent1)) < crossover_rate
@@ -296,19 +302,20 @@ class UniformCrossover(CrossOverFunction):
         else:
             return parent1, parent2
 
+
 class ChromosomeGenerator(ABC):
     """
     Abstract base class for generating chromosomes.
     """
 
-    def __init__(self, length: int, random_generator: Optional[np.random.RandomState] = None):
+    def __init__(self, length: int, random_generator: np.random.RandomState = np.random.RandomState()):
         """
         Initialize the chromosome generator.
         :param length: Length of the chromosome.
         :param random_generator: Optional random generator for reproducibility.
         """
         self.length = length
-        self._random_generator = random_generator if random_generator else np.random.RandomState()
+        self._random_generator = random_generator
 
     @abstractmethod
     def generate_chromosome(self) -> Chromosome:
@@ -317,6 +324,7 @@ class ChromosomeGenerator(ABC):
         :return: Random chromosome.
         """
         pass
+
 
 class RandomChromosomeGenerator(ChromosomeGenerator):
     """
@@ -330,7 +338,6 @@ class RandomChromosomeGenerator(ChromosomeGenerator):
         """
         # Generate a random chromosome with values 0 or 1
         return self._random_generator.randint(0, 2, self.length).astype(np.bool_)
-
 
 
 def generate_population(population_size: int, generator: ChromosomeGenerator) -> Chromosome:
@@ -352,7 +359,8 @@ class LossFunction(ABC):
     """
 
     @abstractmethod
-    def calculate_loss(self, original_image_chromosome: ImageChromosome, dithered_image_chromosome: Chromosome) -> float:
+    def calculate_loss(self, original_image_chromosome: ImageChromosome,
+                       dithered_image_chromosome: Chromosome) -> npt.NDArray[np.float64]:
         """
         Calculate the loss between the original and dithered images.
         :param original_image_chromosome: Chromosome representing the original image (Not limited to only 0 and 1, also inbetween).
@@ -365,50 +373,57 @@ class MeanSquaredErrorLoss(LossFunction):
     """
     Class for calculating the mean squared error loss.
     """
-
-    def calculate_loss(self, original_image: ImageChromosome, dithered_image: Chromosome) -> float:
+    def calculate_loss(self, original_image: ImageChromosome, dithered_image: Chromosome) -> npt.NDArray[np.float64]:
         """
         Calculate the mean squared error loss between the original and dithered images.
         :param original_image: Original image chromosome.
         :param dithered_image: Dithered image chromosome.
         :return: Mean squared error loss value.
         """
-        if len(original_image) != len(dithered_image):
-            raise ValueError("Original and dithered images must have the same size.")
-        return sum((o - d) ** 2 for o, d in zip(original_image, dithered_image)) / len(original_image)
+        if original_image.shape != dithered_image.shape[-1:]:
+            raise ValueError(f"Original and dithered images must have the same size.")
+        # return sum((o - d) ** 2 for o, d in zip(original_image, dithered_image)) / len(original_image)
+        # return np.sum((original_image - dithered_image) ** 2, axis=-1) / original_image.shape[0]
+        return ((original_image - dithered_image) ** 2).mean(axis=-1)
 
 class MeanAbsoluteErrorLoss(LossFunction):
     """
     Class for calculating the mean absolute error loss.
     """
 
-    def calculate_loss(self, original_image: ImageChromosome, dithered_image: Chromosome) -> float:
+    def calculate_loss(self, original_image: ImageChromosome, dithered_image: Chromosome) -> npt.NDArray[np.float64]:
         """
         Calculate the mean absolute error loss between the original and dithered images.
         :param original_image: Original image chromosome.
         :param dithered_image: Dithered image chromosome.
         :return: Mean absolute error loss value.
         """
-        if len(original_image) != len(dithered_image):
-            raise ValueError("Original and dithered images must have the same size.")
-        return sum(abs(o - d) for o, d in zip(original_image, dithered_image)) / len(original_image)
+        if original_image.shape != dithered_image.shape[-1:]:
+            raise ValueError(f"Original and dithered images must have the same size.")
+        # return sum(abs(o - d) for o, d in zip(original_image, dithered_image)) / len(original_image)
+        # return np.sum(np.abs(original_image - dithered_image), axis=-1) / original_image.shape[0]
+        return np.abs(original_image - dithered_image).mean(axis=-1)
 
 class PeakSignalToNoiseRatioLoss(LossFunction):
     """
     Class for calculating the peak signal-to-noise ratio (PSNR) loss.
     """
 
-    def calculate_loss(self, original_image: ImageChromosome, dithered_image: Chromosome) -> float:
+    def calculate_loss(self, original_image: ImageChromosome, dithered_image: Chromosome) -> npt.NDArray[np.float64]:
         """
         Calculate the peak signal-to-noise ratio loss between the original and dithered images.
         :param original_image: Original image chromosome.
         :param dithered_image: Dithered image chromosome.
         :return: Peak signal-to-noise ratio loss value.
         """
+        if original_image.shape != dithered_image.shape[-1:]:
+            raise ValueError(f"Original and dithered images must have the same size.")
+
         mse = MeanSquaredErrorLoss().calculate_loss(original_image, dithered_image)
-        if mse == 0:
-            return float('-inf')  # No noise
-        return -20 * math.log10(1 / math.sqrt(mse))
+        # if mse == 0:
+        #     return float('-inf')  # No noise
+        # return -20 * math.log10(1 / math.sqrt(mse))
+        return -10 * np.log10(mse)
 
 
 class PopulationSelectionFunction(ABC):
@@ -417,7 +432,8 @@ class PopulationSelectionFunction(ABC):
     """
 
     @abstractmethod
-    def select(self, population: npt.NDArray[Chromosome], loss_scores: npt.NDArray[np.float64]) -> (npt.NDArray[Chromosome], npt.NDArray[np.float64]):
+    def select(self, population: npt.NDArray[Chromosome], loss_scores: npt.NDArray[np.float64]) -> (
+            npt.NDArray[Chromosome], npt.NDArray[np.float64]):
         """
         Select a new population based on loss scores.
         :param population: Current population of chromosomes.
@@ -432,7 +448,8 @@ class SelectBestHalf(PopulationSelectionFunction):
     Class for selecting the best half of the population.
     """
 
-    def select(self, population: npt.NDArray[Chromosome], loss_scores: npt.NDArray[np.float64]) -> (npt.NDArray[Chromosome], npt.NDArray[np.float64]):
+    def select(self, population: npt.NDArray[Chromosome], loss_scores: npt.NDArray[np.float64]) -> (
+            npt.NDArray[Chromosome], npt.NDArray[np.float64]):
         """
         Select the best half of the population based on loss scores.
         :param population: Current population of chromosomes.
@@ -446,7 +463,10 @@ class SelectBestHalf(PopulationSelectionFunction):
         return selected_population, selected_loss_scores
 
 
-def dither(original_image: Image, iterations: int, population_size: int, mutation_rate: float, crossover_rate: float, crossover_degree: float, crossover_function: CrossOverFunction, loss_function: LossFunction, population_selection_function: PopulationSelectionFunction, space_filling_curve: SpaceFillingCurve) -> Image:
+
+def dither(original_image: Image, iterations: int, population_size: int, mutation_rate: float, crossover_rate: float,
+           crossover_degree: float, crossover_function: CrossOverFunction, loss_function: LossFunction,
+           population_selection_function: PopulationSelectionFunction, space_filling_curve: SpaceFillingCurve) -> Image:
     """
     Perform dithering on the original image using a genetic algorithm.
     :param original_image: Original image.
@@ -461,13 +481,18 @@ def dither(original_image: Image, iterations: int, population_size: int, mutatio
     :param space_filling_curve: SpaceFillingCurve object for ordering pixels.
     :return: Dithered image.
     """
+    # Evan additions
+    curve = space_filling_curve.generate_curve()
+    rng = np.random.RandomState(42)  # For reproducibility and also not creating a new one every time (that's bad)
+    # End Evan additions
+
     # Initialize population
-    chromosome_length = len(original_image.getdata())
-    generator = RandomChromosomeGenerator(chromosome_length)
+    chromosome_length = len(curve)
+    generator = RandomChromosomeGenerator(chromosome_length, rng)
     population = generate_population(population_size, generator)
     print("Initial population generated.")
 
-    original_in_space_filling_curve = preprocess_image(original_image, space_filling_curve)
+    original_in_space_filling_curve = preprocess_image(original_image, curve)
 
     loss_increase_count = 10
     loss_most_recent = np.ndarray((loss_increase_count,), np.float64, np.array([np.inf] * loss_increase_count))
@@ -480,17 +505,24 @@ def dither(original_image: Image, iterations: int, population_size: int, mutatio
     for i in range(iterations):
         # Evaluate loss
         # loss_scores = [loss_function.calculate_loss(original_in_space_filling_curve, chromosome) for chromosome in population]
-        with concurrent.futures.ThreadPoolExecutor(20) as executor:
-            loss_scores = np.fromiter(executor.map(
-                lambda chromosome: loss_function.calculate_loss(original_in_space_filling_curve, chromosome),
-                population
-            ), np.float64, count=population_size)
-        best_score = min(loss_scores)
-        index_of_best = np.argmin(loss_scores)
+        # with concurrent.futures.ThreadPoolExecutor(20) as executor:
+        #     loss_scores = np.fromiter(executor.map(
+        #         lambda chromosome: loss_function.calculate_loss(original_in_space_filling_curve, chromosome),
+        #         population
+        #     ), np.float64, count=population_size)
+        # loss_scores = np.fromiter(
+        #     (loss_function.calculate_loss(original_in_space_filling_curve, chromosome) for chromosome in population),
+        #     np.float64)
+        loss_scores = np.array(
+            [loss_function.calculate_loss(original_in_space_filling_curve, chromosome) for chromosome in population])
+        # loss_scores = loss_function.calculate_loss(original_in_space_filling_curve, population)
+        best_score = loss_scores.min()
+        index_of_best = loss_scores.argmin()
         curr_best_chromosome = population[index_of_best]
         # Save the best chromosome as an image
         if prev_best != best_score:
-            save_image(convert_chromosome_to_image(curr_best_chromosome, original_image.size[0], original_image.size[1], space_filling_curve),
+            save_image(convert_chromosome_to_image(curr_best_chromosome, original_image.size[0], original_image.size[1],
+                                                   curve),
                        f"progress/groepsfoto_resized_smaller_scaled_dithered_uniform_{i}.png")
         prev_best = best_score
 
@@ -505,10 +537,12 @@ def dither(original_image: Image, iterations: int, population_size: int, mutatio
         loss_most_recent_diff = np.diff(loss_most_recent)
         average_loss_decrease = np.average(-loss_most_recent_diff)
 
-        print(f"{i}: Best loss score: {best_score}, mutation rate: {mutation_rate}, crossover rate: {crossover_rate}, crossover degree: {crossover_degree}, average loss decrease: {average_loss_decrease}")
+        print(
+            f"{i}: Best loss score: {best_score}, mutation rate: {mutation_rate}, crossover rate: {crossover_rate}, crossover degree: {crossover_degree}, average loss decrease: {average_loss_decrease}")
 
         if average_loss_decrease < hyperparameter_threshold:
-            print(f"changing mutation rate, crossover rate and crossover degree because the average loss decrease: {average_loss_decrease} < {hyperparameter_threshold}")
+            print(
+                f"changing mutation rate, crossover rate and crossover degree because the average loss decrease: {average_loss_decrease} < {hyperparameter_threshold}")
             mutation_rate *= 0.75
             crossover_rate += (1 - crossover_rate) * 0.1
             crossover_degree *= 0.9
@@ -521,21 +555,24 @@ def dither(original_image: Image, iterations: int, population_size: int, mutatio
         # Generate new chromosomes
         for j in range(len(preserved), population_size):
             # Select parents using a weighted probability based on loss scores
-            p1_index = np.random.choice(len(selected_population), p=selected_loss_scores / np.sum(selected_loss_scores))
+            p1_index = rng.choice(len(selected_population), p=selected_loss_scores / np.sum(selected_loss_scores))
             parent1 = selected_population[p1_index]
-            p2_index = np.random.choice(len(selected_population), p=selected_loss_scores / np.sum(selected_loss_scores))
-            # make sure parent2 is not the same as parent1
+            p2_index = rng.choice(len(selected_population), p=selected_loss_scores / np.sum(selected_loss_scores))
+            # make sure parent2 is different from parent1
             while p2_index == p1_index:
-                p2_index = np.random.choice(len(selected_population), p=selected_loss_scores / np.sum(selected_loss_scores))
+                p2_index = rng.choice(len(selected_population),
+                                      p=selected_loss_scores / np.sum(selected_loss_scores))
             parent2 = selected_population[p2_index]
-            offspring1, offspring2 = crossover_function.crossover(parent1, parent2, crossover_rate, crossover_degree)
-            new_population[j] = mutate_chromosome(offspring1, mutation_rate)
+            offspring1, offspring2 = crossover_function.crossover(parent1, parent2, crossover_rate, crossover_degree,
+                                                                  rng)
+            new_population[j] = mutate_chromosome(offspring1, mutation_rate, rng)
 
         population = new_population
 
     # Return the best chromosome as the dithered image
-    best_chromosome = min(population, key=lambda c: loss_function.calculate_loss(original_in_space_filling_curve, c))
-    return convert_chromosome_to_image(best_chromosome, original_image.size[0], original_image.size[1], space_filling_curve)
+    # best_chromosome = min(population, key=lambda c: loss_function.calculate_loss(original_in_space_filling_curve, c))
+    best_chromosome = population[loss_function.calculate_loss(original_in_space_filling_curve, population).argmin()]
+    return convert_chromosome_to_image(best_chromosome, original_image.size[0], original_image.size[1], curve)
 
 
 # Example usage:
@@ -547,18 +584,12 @@ if __name__ == '__main__':
 
     # Dither
     print("Starting dithering...")
-    my_dithered_image = dither(my_image, iterations=1000, population_size=1000, mutation_rate=0.005,
-                             crossover_rate=0.75,
-                             crossover_degree=0.30,
-                             crossover_function=UniformCrossover(),
-                             loss_function=MeanSquaredErrorLoss(),
-                             population_selection_function=SelectBestHalf(),
-                             space_filling_curve=HilbertCurve(my_image.size[0], my_image.size[1]))
+    my_dithered_image = dither(my_image, iterations=6000, population_size=1000, mutation_rate=0.005,
+                               crossover_rate=0.75,
+                               crossover_degree=0.30,
+                               crossover_function=UniformCrossover(),
+                               loss_function=MeanSquaredErrorLoss(),
+                               population_selection_function=SelectBestHalf(),
+                               space_filling_curve=HilbertCurve(my_image.size[0], my_image.size[1]))
 
     save_image(my_dithered_image, "groepsfoto_resized_smaller_scaled_dithered_uniform.png")
-
-
-
-
-
-
